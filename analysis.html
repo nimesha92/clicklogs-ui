@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Tap Logs Analysis</title>
 </head>
-
 <body>
   <h2>Tap Data Analysis</h2>
   <div id="result">Loading...</div>
@@ -14,13 +13,9 @@
   import {
     getFirestore,
     collection,
-    query,
-    where,
-    getAggregateFromServer,
-    average
+    getDocs
   } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // ✅ YOUR FIREBASE CONFIG (already correct)
   const firebaseConfig = {
     apiKey: "AIzaSyCgpDKpDgWRduAaU10YbN0UaF53O5fCbUE",
     authDomain: "clicklogs-44449.firebaseapp.com",
@@ -33,60 +28,50 @@
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
 
+  function average(arr) {
+    if (arr.length === 0) return "No data";
+    const sum = arr.reduce((a, b) => a + b, 0);
+    return (sum / arr.length).toFixed(2);
+  }
+
   async function runAnalysis() {
     try {
+      const snapshot = await getDocs(collection(db, "tap_logs"));
 
-      // 🔹 Android average
-      const androidQuery = query(
-        collection(db, "tap_logs"),
-        where("device_platform", "==", "android")
-      );
+      const androidDurations = [];
+      const pcDurations = [];
+      const feedbackDurations = [];
+      const noFeedbackDurations = [];
 
-      const androidAgg = await getAggregateFromServer(androidQuery, {
-        avgDuration: average("duration_ms")
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        const duration = Number(data.duration_ms);
+
+        if (!isNaN(duration)) {
+          if (data.device_platform === "android") {
+            androidDurations.push(duration);
+          }
+          if (data.device_platform === "pc") {
+            pcDurations.push(duration);
+          }
+          if (data.interface_type === "feedbackshown") {
+            feedbackDurations.push(duration);
+          }
+          if (data.interface_type === "nofeedback") {
+            noFeedbackDurations.push(duration);
+          }
+        }
       });
 
-      // 🔹 PC average
-      const pcQuery = query(
-        collection(db, "tap_logs"),
-        where("device_platform", "==", "pc")
-      );
-
-      const pcAgg = await getAggregateFromServer(pcQuery, {
-        avgDuration: average("duration_ms")
-      });
-
-      // 🔹 Feedback average
-      const feedbackQuery = query(
-        collection(db, "tap_logs"),
-        where("interface_type", "==", "feedbackshown")
-      );
-
-      const feedbackAgg = await getAggregateFromServer(feedbackQuery, {
-        avgDuration: average("duration_ms")
-      });
-
-      // 🔹 No-feedback average
-      const noFeedbackQuery = query(
-        collection(db, "tap_logs"),
-        where("interface_type", "==", "nofeedback")
-      );
-
-      const noFeedbackAgg = await getAggregateFromServer(noFeedbackQuery, {
-        avgDuration: average("duration_ms")
-      });
-
-      // 🔥 Show results
       document.getElementById("result").innerHTML = `
-        <h3>Mean Tap Duration (Device)</h3>
-        <p><b>Android:</b> ${androidAgg.data().avgDuration ?? "No data"} ms</p>
-        <p><b>PC:</b> ${pcAgg.data().avgDuration ?? "No data"} ms</p>
+        <h3>Mean Tap Duration by Device</h3>
+        <p><b>Android:</b> ${average(androidDurations)} ms</p>
+        <p><b>PC:</b> ${average(pcDurations)} ms</p>
 
-        <h3>Mean Tap Duration (Interface)</h3>
-        <p><b>Feedback Shown:</b> ${feedbackAgg.data().avgDuration ?? "No data"} ms</p>
-        <p><b>No Feedback:</b> ${noFeedbackAgg.data().avgDuration ?? "No data"} ms</p>
+        <h3>Mean Tap Duration by Interface</h3>
+        <p><b>Feedback Shown:</b> ${average(feedbackDurations)} ms</p>
+        <p><b>No Feedback:</b> ${average(noFeedbackDurations)} ms</p>
       `;
-
     } catch (error) {
       console.error(error);
       document.getElementById("result").innerHTML = "Error loading data";
@@ -95,6 +80,5 @@
 
   runAnalysis();
 </script>
-
 </body>
 </html>
