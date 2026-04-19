@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Tap Logs Analysis</title>
+</head>
+
+<body>
+  <h2>Tap Data Analysis</h2>
+  <div id="result">Loading...</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import {
+    getFirestore,
+    collection,
+    query,
+    where,
+    getAggregateFromServer,
+    average
+  } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // ✅ YOUR FIREBASE CONFIG (already correct)
+  const firebaseConfig = {
+    apiKey: "AIzaSyCgpDKpDgWRduAaU10YbN0UaF53O5fCbUE",
+    authDomain: "clicklogs-44449.firebaseapp.com",
+    projectId: "clicklogs-44449",
+    storageBucket: "clicklogs-44449.firebasestorage.app",
+    messagingSenderId: "1024274233277",
+    appId: "1:1024274233277:web:e059e96fb2bd91fcb844d4"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  async function runAnalysis() {
+    try {
+
+      // 🔹 Android average
+      const androidQuery = query(
+        collection(db, "tap_logs"),
+        where("device_platform", "==", "android")
+      );
+
+      const androidAgg = await getAggregateFromServer(androidQuery, {
+        avgDuration: average("duration_ms")
+      });
+
+      // 🔹 PC average
+      const pcQuery = query(
+        collection(db, "tap_logs"),
+        where("device_platform", "==", "pc")
+      );
+
+      const pcAgg = await getAggregateFromServer(pcQuery, {
+        avgDuration: average("duration_ms")
+      });
+
+      // 🔹 Feedback average
+      const feedbackQuery = query(
+        collection(db, "tap_logs"),
+        where("interface_type", "==", "feedbackshown")
+      );
+
+      const feedbackAgg = await getAggregateFromServer(feedbackQuery, {
+        avgDuration: average("duration_ms")
+      });
+
+      // 🔹 No-feedback average
+      const noFeedbackQuery = query(
+        collection(db, "tap_logs"),
+        where("interface_type", "==", "nofeedback")
+      );
+
+      const noFeedbackAgg = await getAggregateFromServer(noFeedbackQuery, {
+        avgDuration: average("duration_ms")
+      });
+
+      // 🔥 Show results
+      document.getElementById("result").innerHTML = `
+        <h3>Mean Tap Duration (Device)</h3>
+        <p><b>Android:</b> ${androidAgg.data().avgDuration ?? "No data"} ms</p>
+        <p><b>PC:</b> ${pcAgg.data().avgDuration ?? "No data"} ms</p>
+
+        <h3>Mean Tap Duration (Interface)</h3>
+        <p><b>Feedback Shown:</b> ${feedbackAgg.data().avgDuration ?? "No data"} ms</p>
+        <p><b>No Feedback:</b> ${noFeedbackAgg.data().avgDuration ?? "No data"} ms</p>
+      `;
+
+    } catch (error) {
+      console.error(error);
+      document.getElementById("result").innerHTML = "Error loading data";
+    }
+  }
+
+  runAnalysis();
+</script>
+
+</body>
+</html>
